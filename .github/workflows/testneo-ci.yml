@@ -53,26 +53,9 @@ jobs:
 
       - name: Install system dependencies
         run: |
-           python -m pip install --upgrade pip
-           pip install "playwright>=1.40.0"
-           pip install psutil
-           pip install python-dotenv==1.0.0
-           pip install requests==2.32.3
-           pip install httpx==0.25.2
-           pip install "pydantic>=2.0"
-           pip install "pydantic-settings>=2.0"
-           pip install "sqlalchemy>=1.4,<2.0"
-           pip install "aiofiles>=23.0"
-           pip install "openai>=1.0"
-           pip install "langchain>=0.2"
-           pip install "langchain-community>=0.2"
-           pip install "langgraph>=0.2,<0.3"
-           pip install "PyYAML>=6.0"
-           pip install "structlog>=23.0"
-           pip install "numpy>=1.24.0"
-           pip install "Pillow>=10.0"
-           pip install "groq>=0.4.0"
-           playwright install chromium
+            python -m pip install --upgrade pip
+            pip install playwright psutil python-dotenv requests httpx pydantic pydantic-settings sqlalchemy aiofiles openai langchain langchain-community langgraph PyYAML structlog numpy Pillow groq
+            playwright install chromium
 
       - name: Download TestNeo Agent & Engine Bundle
         env:
