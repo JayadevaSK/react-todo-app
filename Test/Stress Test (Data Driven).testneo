@@ -1,0 +1,27 @@
+Navigate to http://localhost:5173
+
+Wait for 2 seconds
+
+Data:
+taskName
+Task A
+Task B
+Task C
+Task D
+Task E
+Task F
+Task G
+Task H
+End Data:
+
+For each row:
+
+Fill "Enter task" with "{taskName}"
+
+Click on Add
+
+Wait for 1 second
+
+Verify page contains "{taskName}"
+
+End For

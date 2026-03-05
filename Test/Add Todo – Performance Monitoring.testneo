@@ -1,0 +1,6 @@
+Navigate to http://localhost:5173/
+Wait for 2 seconds
+Fill input with "Learn TestNeo Automation"
+Click on "Add"
+Wait for 1 second
+Verify page contains "Learn TestNeo Automation"

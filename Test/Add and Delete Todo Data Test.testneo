@@ -1,0 +1,26 @@
+Navigate to http://localhost:5173/
+
+Wait for 2 seconds
+
+Data:
+taskName
+Delete Test 1
+Delete Test 2
+Delete Test 3
+End Data:
+
+For each row:
+
+Fill "Enter task" with "{taskName}"
+
+Click on Add
+
+Wait for 1 second
+
+Verify page contains "{taskName}"
+
+Click on Delete
+
+Wait for 1 second
+
+End For

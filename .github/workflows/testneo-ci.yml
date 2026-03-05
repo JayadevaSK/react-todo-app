@@ -1,0 +1,132 @@
+# Save as: .github/workflows/testneo-ci.yml
+name: TestNeo CI
+
+on:
+  push:
+    branches: [ main, staging, develop, master ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Test tags (comma-separated, e.g. "smoke,sanity" or "regression"). Default: cicd'
+        required: false
+        default: 'cicd'
+      build_number:
+        description: 'Build number/version (e.g. "Build 2.1", "v2.1.0")'
+        required: false
+      release_name:
+        description: 'Release name (e.g. "Release 3.0", "Sprint-42")'
+        required: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    
+    env:
+      TESTNEO_MAX_WORKERS: "4"
+      TESTNEO_BATCH_SIZE: "10"
+      TESTNEO_TEST_TIMEOUT: "600"
+      SKIP_RESOURCE_CHECK: "true"
+      TESTNEO_AGENT_MODE: "true"
+      AGENT_MODE: "true"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install playwright>=1.40.0 psutil python-dotenv==1.0.0 \
+            requests==2.32.3 httpx==0.25.2 pydantic>=2.0 pydantic-settings>=2.0 \
+            sqlalchemy>=1.4,<2.0 aiofiles>=23.0 openai>=1.0 langchain>=0.2 \
+            langchain-community>=0.2 langgraph>=0.2,<0.3 PyYAML>=6.0 \
+            structlog>=23.0 numpy>=1.24.0 Pillow>=10.0 groq>=0.4.0
+          playwright install chromium
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 \
+            libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64 \
+            libatspi2.0-0 libxshmfence1
+
+      - name: Download TestNeo Agent & Engine Bundle
+        env:
+          TESTNEO_SERVER: ${{ secrets.TESTNEO_SERVER }}
+          TESTNEO_API_KEY: ${{ secrets.TESTNEO_API_KEY }}
+        run: |
+          curl -f -H "X-API-Key: $TESTNEO_API_KEY" \
+            "$TESTNEO_SERVER/api/web/v1/ci/agent-files/agent.py" -o agent.py
+          curl -f -H "X-API-Key: $TESTNEO_API_KEY" \
+            "$TESTNEO_SERVER/api/web/v1/ci/agent-files/batch_publisher.py" -o batch_publisher.py
+          curl -f "$TESTNEO_SERVER/api/web/v1/agents/download-bundle?api_key=$TESTNEO_API_KEY" \
+            -o testneo-engine-bundle.zip
+          unzip -qo testneo-engine-bundle.zip && rm testneo-engine-bundle.zip
+
+      - name: Trigger TestNeo CI Job
+        id: trigger
+        env:
+          TESTNEO_SERVER: ${{ secrets.TESTNEO_SERVER }}
+          TESTNEO_API_KEY: ${{ secrets.TESTNEO_API_KEY }}
+          TESTNEO_PROJECT_ID: ${{ secrets.TESTNEO_PROJECT_ID }}
+        run: |
+          BUILD_NUM="${{ github.event.inputs.build_number }}"
+          [ -z "$BUILD_NUM" ] && BUILD_NUM="ci-${{ github.ref_name }}-$(echo ${{ github.sha }} | cut -c1-8)"
+          REL_NAME="${{ github.event.inputs.release_name }}"
+          [ -z "$REL_NAME" ] && REL_NAME="${{ github.ref_name }}"
+          
+          TAGS_INPUT="${{ github.event.inputs.tags }}"
+          if [ -z "$TAGS_INPUT" ]; then
+            TAGS='[\"cicd\"]'
+          else
+            TAGS="[\\"$(echo "$TAGS_INPUT" | sed 's/,/\",\"/g')\\"]"
+          fi
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$TESTNEO_SERVER/api/web/v1/ci/trigger" \
+            -H "X-API-Key: $TESTNEO_API_KEY" -H "Content-Type: application/json" \
+            -d "{\"project_id\": $TESTNEO_PROJECT_ID, \"tags\": $TAGS, \"branch\": \"$GITHUB_REF_NAME\", \
+                \"commit_sha\": \"$GITHUB_SHA\", \"triggered_by\": \"github_actions\", \
+                \"github_run_id\": \"$GITHUB_RUN_ID\", \"build_number\": \"$BUILD_NUM\", \
+                \"release_name\": \"$REL_NAME\"}")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          [ "$HTTP_CODE" -ge 400 ] && exit 1
+          
+          JOB_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
+          TOTAL_TESTS=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['total_tests'])")
+          echo "JOB_ID=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_OUTPUT
+
+      - name: Run TestNeo Tests
+        env:
+          TESTNEO_SERVER: ${{ secrets.TESTNEO_SERVER }}
+          TESTNEO_API_KEY: ${{ secrets.TESTNEO_API_KEY }}
+          TESTNEO_JOB_ID: ${{ steps.trigger.outputs.JOB_ID }}
+        run: python3 agent.py
+      
+      - name: Check Results
+        if: always() && steps.trigger.outputs.JOB_ID != ''
+        env:
+          TESTNEO_SERVER: ${{ secrets.TESTNEO_SERVER }}
+          TESTNEO_API_KEY: ${{ secrets.TESTNEO_API_KEY }}
+          JOB_ID: ${{ steps.trigger.outputs.JOB_ID }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" "$TESTNEO_SERVER/api/web/v1/ci/status/$JOB_ID" \
+            -H "X-API-Key: $TESTNEO_API_KEY")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          [ "$HTTP_CODE" -ne 200 ] && exit 1
+          echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); \
+            print(f'Status: {d[\"status\"]}'); print(f'Passed: {d[\"passed\"]}'); \
+            print(f'Failed: {d[\"failed\"]}'); print(f'Total: {d[\"total\"]}'); \
+            sys.exit(0 if d['failed']==0 else 1)"

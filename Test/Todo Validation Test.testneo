@@ -1,0 +1,23 @@
+Navigate to http://localhost:5173
+
+Wait for 2 seconds
+
+Data:
+taskName
+""
+" "
+End Data:
+
+For each row:
+
+Fill "Enter task" with "{taskName}"
+
+Click on Add
+
+Wait for 1 second
+
+End For
+
+Expected Result:
+
+Empty tasks should not be added to the Todo list

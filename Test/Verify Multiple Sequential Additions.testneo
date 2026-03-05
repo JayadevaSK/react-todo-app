@@ -1,0 +1,15 @@
+Navigate to http://localhost:5173
+Wait for 2 seconds
+
+Fill input with "Task A"
+Click on "Add"
+
+Fill input with "Task B"
+Click on "Add"
+
+Fill input with "Task C"
+Click on "Add"
+
+Verify page contains "Task A"
+Verify page contains "Task B"
+Verify page contains "Task C"

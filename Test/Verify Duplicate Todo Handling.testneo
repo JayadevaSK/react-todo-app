@@ -1,0 +1,10 @@
+Navigate to http://localhost:5173
+Wait for 2 seconds
+
+Fill input with "Duplicate Task"
+Click on "Add"
+
+Fill input with "Duplicate Task"
+Click on "Add"
+
+Verify page contains "Duplicate Task"

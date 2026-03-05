@@ -1,0 +1,8 @@
+Navigate to http://localhost:5173
+Wait for 2 seconds
+Fill input with "Refresh Test"
+Click on "Add"
+Wait for 1 second
+Refresh page
+Wait for 2 seconds
+Verify page contains "Refresh Test"
