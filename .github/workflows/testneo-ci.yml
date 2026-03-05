@@ -3,7 +3,7 @@ name: TestNeo CI
 
 on:
   push:
-    branches: [ main, staging, develop ]
+    branches: [ main, staging, develop, master ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
